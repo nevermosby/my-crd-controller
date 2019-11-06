@@ -1,0 +1,6 @@
+apiVersion: mycontroller.nevermosby.io/v1alpha1
+kind: Website
+metadata:
+  name: kubia
+spec:
+  gitRepo: https://github.com/luksa/kubia-website-example.git
