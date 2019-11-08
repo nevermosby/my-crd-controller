@@ -3,4 +3,6 @@ kind: Website
 metadata:
   name: kubia
 spec:
+  deploymentName: kubia-website
   gitRepo: https://github.com/luksa/kubia-website-example.git
+  replicas: 2

@@ -17,6 +17,8 @@ type Website struct {
 
 type WebsiteSpec struct {
     GitRepo string `json:"gitRepo"`
+    DeploymentName string `json:"deploymentName"`
+	Replicas       *int32 `json:"replicas"`
     // TargetDeployment string `json:"targetDeployment"`
     // MinReplicas      int    `json:"minReplicas"`
     // MaxReplicas      int    `json:"maxReplicas"`

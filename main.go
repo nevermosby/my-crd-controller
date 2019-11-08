@@ -1,58 +1,71 @@
 package main
 
 import (
-    "fmt"
-    "log"
-    "os"
-    "time"
+	"flag"
+	"time"
+	"os"
 
-    "k8s.io/apimachinery/pkg/labels"
-    "k8s.io/client-go/tools/clientcmd"
-    clientset "github.com/nevermosby/my-crd-controller/pkg/client/clientset/versioned"
+	kubeinformers "k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog"
+	// Uncomment the following line to load the gcp plugin (only required to authenticate against GKE clusters).
+	// _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+
+	// clientset "k8s.io/sample-controller/pkg/generated/clientset/versioned"
+	// informers "k8s.io/sample-controller/pkg/generated/informers/externalversions"
+	clientset "github.com/nevermosby/my-crd-controller/pkg/client/clientset/versioned"
     informers "github.com/nevermosby/my-crd-controller/pkg/client/informers/externalversions"
+	"k8s.io/sample-controller/pkg/signals"
+)
+
+var (
+	masterURL  string
+	kubeconfig string
 )
 
 func main() {
-    client, err := newCustomKubeClient()
-    if err != nil {
-        log.Fatalf("new kube client error: %v", err)
-    }
+	klog.InitFlags(nil)
+	flag.Parse()
 
-    factory := informers.NewSharedInformerFactory(client, 30*time.Second)
-    informer := factory.Mycontroller().V1alpha1().Websites()
-    lister := informer.Lister()
+	// set up signals so we handle the first shutdown signal gracefully
+	stopCh := signals.SetupSignalHandler()
 
-    stopCh := make(chan struct{})
-    factory.Start(stopCh)
+	kubeConfigPath := os.Getenv("HOME") + "/.kube/config"
+    cfg, err := clientcmd.BuildConfigFromFlags("", kubeConfigPath)
+	// cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
+	if err != nil {
+		klog.Fatalf("Error building kubeconfig: %s", err.Error())
+	}
 
-    for {
-        ret, err := lister.List(labels.Everything())
-        if err != nil {
-            log.Printf("list error: %v", err)
-        } else {
-            for _, website := range ret {
-                log.Println(website)
-            }
-        }
+	kubeClient, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		klog.Fatalf("Error building kubernetes clientset: %s", err.Error())
+	}
 
-        time.Sleep(5 * time.Second)
-    }
+	exampleClient, err := clientset.NewForConfig(cfg)
+	if err != nil {
+		klog.Fatalf("Error building example clientset: %s", err.Error())
+	}
+
+	kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Second*30)
+	exampleInformerFactory := informers.NewSharedInformerFactory(exampleClient, time.Second*30)
+
+	controller := NewController(kubeClient, exampleClient,
+		kubeInformerFactory.Apps().V1().Deployments(),
+		exampleInformerFactory.Mycontroller().V1alpha1().Websites())
+
+	// notice that there is no need to run Start methods in a separate goroutine. (i.e. go kubeInformerFactory.Start(stopCh)
+	// Start method is non-blocking and runs all registered informers in a dedicated goroutine.
+	kubeInformerFactory.Start(stopCh)
+	exampleInformerFactory.Start(stopCh)
+
+	if err = controller.Run(2, stopCh); err != nil {
+		klog.Fatalf("Error running controller: %s", err.Error())
+	}
 }
 
-func newCustomKubeClient() (clientset.Interface, error) {
-	kubeConfigPath := os.Getenv("HOME") + "/.kube/config"
-	
-	//kubeconfig := flag.String("kubeconfig", "/Users/davidli/.kube/config", "kubeconfig file")
-
-
-    config, err := clientcmd.BuildConfigFromFlags("", kubeConfigPath)
-    if err != nil {
-        return nil, fmt.Errorf("failed to create out-cluster kube cli configuration: %v", err)
-    }
-
-    cli, err := clientset.NewForConfig(config)
-    if err != nil {
-        return nil, fmt.Errorf("failed to create custom kube client: %v", err)
-    }
-    return cli, nil
+func init() {
+	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
+	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 }
