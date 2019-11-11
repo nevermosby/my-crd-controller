@@ -6,15 +6,23 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	v1core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	_ "k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
+	// for service
+	servicesinformers "k8s.io/client-go/informers/core/v1"
+
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	appslisters "k8s.io/client-go/listers/apps/v1"
+
+	v1 "k8s.io/client-go/listers/core/v1"
+
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -58,11 +66,14 @@ type Controller struct {
 	// sampleclientset is a clientset for our own API group
 	sampleclientset clientset.Interface
 
+	// service list
+	servicesLister v1.ServiceLister
+
 	deploymentsLister appslisters.DeploymentLister
 	deploymentsSynced cache.InformerSynced
-	// foosLister        listers.FooLister
+	// websitesLister        listers.WebsiteLister
 	websitesLister listers.WebsiteLister
-	// foosSynced        cache.InformerSynced
+	// websitesSynced        cache.InformerSynced
 	websitesSynced cache.InformerSynced
 
 	// workqueue is a rate limited work queue. This is used to queue work to be
@@ -81,6 +92,7 @@ func NewController(
 	kubeclientset kubernetes.Interface,
 	sampleclientset clientset.Interface,
 	deploymentInformer appsinformers.DeploymentInformer,
+	serviceInformer servicesinformers.ServiceInformer,
 	websiteInformer informers.WebsiteInformer) *Controller {
 
 	// Create event broadcaster
@@ -98,6 +110,7 @@ func NewController(
 		kubeclientset:     kubeclientset,
 		sampleclientset:   sampleclientset,
 		deploymentsLister: deploymentInformer.Lister(),
+		servicesLister:    serviceInformer.Lister(),
 		deploymentsSynced: deploymentInformer.Informer().HasSynced,
 		websitesLister:    websiteInformer.Lister(),
 		websitesSynced:    websiteInformer.Informer().HasSynced,
@@ -268,6 +281,29 @@ func (c *Controller) syncHandler(key string) error {
 		return nil
 	}
 
+	// use deploynment name for service name
+	serviceName := fmt.Sprintf("%s-%s", deploymentName, "npsvc")
+	// just for test, show all service
+	// allService, err := c.servicesLister.List(labels.Everything())
+	// klog.Infof("all service list: %v", allService)
+
+	webSiteService, err := c.servicesLister.Services(website.Namespace).Get(serviceName)
+	if errors.IsNotFound(err) {
+		klog.Info("not found target website service, about to create")
+		targetService, err := c.kubeclientset.CoreV1().Services(website.Namespace).Create(newService(website))
+
+		// If an error occurs during Get/Create, we'll requeue the item so we can
+		// attempt processing again later. This could have been caused by a
+		// temporary network failure, or any other transient reason.
+		if err != nil {
+			return err
+		}
+		klog.Info("target website service created: %v", targetService)
+
+	} else {
+		klog.Infof("target service found: %v", webSiteService)
+	}
+
 	// Get the deployment with the name specified in Website.spec
 	deployment, err := c.deploymentsLister.Deployments(website.Namespace).Get(deploymentName)
 	// If the resource doesn't exist, we'll create it
@@ -298,6 +334,8 @@ func (c *Controller) syncHandler(key string) error {
 		deployment, err = c.kubeclientset.AppsV1().Deployments(website.Namespace).Update(newDeployment(website))
 	}
 
+	//TODO: need to update svc?
+
 	// If an error occurs during Update, we'll requeue the item so we can
 	// attempt processing again later. THis could have been caused by a
 	// temporary network failure, or any other transient reason.
@@ -305,7 +343,7 @@ func (c *Controller) syncHandler(key string) error {
 		return err
 	}
 
-	// Finally, we update the status block of the Foo resource to reflect the
+	// Finally, we update the status block of the website resource to reflect the
 	// current state of the world
 	err = c.updateWebsiteStatus(website, deployment)
 	if err != nil {
@@ -380,6 +418,40 @@ func (c *Controller) handleObject(obj interface{}) {
 
 		c.enqueueWebsite(website)
 		return
+	}
+}
+
+// newService creates a new service for website deployment
+func newService(website *myv1alpha1.Website) *v1core.Service {
+	deploymentName := website.Spec.DeploymentName
+	// use deploynment name for service name
+	serviceName := fmt.Sprintf("%s-%s", deploymentName, "npsvc")
+	labels := map[string]string{
+		"app":        "website",
+		"controller": website.Name,
+	}
+	selectLabels := map[string]string{
+		"app":        "website-nginx",
+		"controller": website.Name,
+	}
+	return &v1core.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      serviceName,
+			Namespace: website.Namespace,
+			Labels:    labels,
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(website, myv1alpha1.SchemeGroupVersion.WithKind("Website")),
+			},
+		},
+		Spec: v1core.ServiceSpec{
+			Ports: []v1core.ServicePort{
+				{
+					Port:     80,
+					Protocol: v1core.ProtocolTCP,
+				}},
+			Type:     v1core.ServiceTypeNodePort,
+			Selector: selectLabels,
+		},
 	}
 }
 
