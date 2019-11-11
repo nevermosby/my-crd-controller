@@ -19,3 +19,10 @@ Generating listers for mycontroller:v1alpha1 at github.com/nevermosby/my-crd-con
 Generating informers for mycontroller:v1alpha1 at github.com/nevermosby/my-crd-controller/pkg/client/informers
 
 ```
+
+## TODO
+- create nodeport service
+
+```yaml
+k expose deployment kubia-website --type=NodePort --name=website
+```

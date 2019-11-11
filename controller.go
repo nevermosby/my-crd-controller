@@ -29,10 +29,9 @@ import (
 	myv1alpha1 "github.com/nevermosby/my-crd-controller/pkg/apis/mycontroller/v1alpha1"
 	clientset "github.com/nevermosby/my-crd-controller/pkg/client/clientset/versioned"
 	// informers "github.com/nevermosby/my-crd-controller/pkg/client/informers/externalversions"
-	informers "github.com/nevermosby/my-crd-controller/pkg/client/informers/externalversions/mycontroller/v1alpha1"
 	samplescheme "github.com/nevermosby/my-crd-controller/pkg/client/clientset/versioned/scheme"
+	informers "github.com/nevermosby/my-crd-controller/pkg/client/informers/externalversions/mycontroller/v1alpha1"
 	listers "github.com/nevermosby/my-crd-controller/pkg/client/listers/mycontroller/v1alpha1"
-	
 )
 
 const controllerAgentName = "my-controller"
@@ -62,9 +61,9 @@ type Controller struct {
 	deploymentsLister appslisters.DeploymentLister
 	deploymentsSynced cache.InformerSynced
 	// foosLister        listers.FooLister
-	websitesLister     listers.WebsiteLister
+	websitesLister listers.WebsiteLister
 	// foosSynced        cache.InformerSynced
-	websitesSynced        cache.InformerSynced
+	websitesSynced cache.InformerSynced
 
 	// workqueue is a rate limited work queue. This is used to queue work to be
 	// processed instead of performing it as soon as a change happens. This
@@ -412,8 +411,65 @@ func newDeployment(website *myv1alpha1.Website) *appsv1.Deployment {
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
+							// nginx container for hosting website
 							Name:  "nginx",
-							Image: "nginx:alpline",
+							Image: "nginx",
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "html",
+									MountPath: "/usr/share/nginx/html",
+									ReadOnly:  true,
+								},
+							},
+							Ports: []corev1.ContainerPort{
+								{
+									ContainerPort: 80,
+									Protocol:      "TCP",
+								},
+							},
+						},
+						{
+							// git sync container for fetching code
+							Name:  "git-sync",
+							Image: "openweb/git-sync",
+							Env: []corev1.EnvVar{
+								{
+									Name:  "GIT_SYNC_REPO",
+									Value: website.Spec.GitRepo,
+								},
+								{
+									Name:  "GIT_SYNC_DEST",
+									Value: "/gitrepo",
+								},
+								{
+									Name:  "GIT_SYNC_BRANCH",
+									Value: "master",
+								},
+								{
+									Name:  "GIT_SYNC_REV",
+									Value: "FETCH_HEAD",
+								},
+								{
+									Name:  "GIT_SYNC_WAIT",
+									Value: "3600",
+								},
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "html",
+									MountPath: "/gitrepo",
+								},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "html",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{
+									Medium: "",
+								},
+							},
 						},
 					},
 				},

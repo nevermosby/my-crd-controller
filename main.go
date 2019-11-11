@@ -2,8 +2,8 @@ package main
 
 import (
 	"flag"
-	"time"
 	"os"
+	"time"
 
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -15,7 +15,7 @@ import (
 	// clientset "k8s.io/sample-controller/pkg/generated/clientset/versioned"
 	// informers "k8s.io/sample-controller/pkg/generated/informers/externalversions"
 	clientset "github.com/nevermosby/my-crd-controller/pkg/client/clientset/versioned"
-    informers "github.com/nevermosby/my-crd-controller/pkg/client/informers/externalversions"
+	informers "github.com/nevermosby/my-crd-controller/pkg/client/informers/externalversions"
 	"k8s.io/sample-controller/pkg/signals"
 )
 
@@ -32,7 +32,7 @@ func main() {
 	stopCh := signals.SetupSignalHandler()
 
 	kubeConfigPath := os.Getenv("HOME") + "/.kube/config"
-    cfg, err := clientcmd.BuildConfigFromFlags("", kubeConfigPath)
+	cfg, err := clientcmd.BuildConfigFromFlags("", kubeConfigPath)
 	// cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
 	if err != nil {
 		klog.Fatalf("Error building kubeconfig: %s", err.Error())

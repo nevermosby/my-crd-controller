@@ -1,25 +1,26 @@
 package v1alpha1
 
 import (
-    "github.com/nevermosby/my-crd-controller/pkg/apis/mycontroller"
+	"github.com/nevermosby/my-crd-controller/pkg/apis/mycontroller"
 
-    metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-    "k8s.io/apimachinery/pkg/runtime"
-    "k8s.io/apimachinery/pkg/runtime/schema"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 var SchemeGroupVersion = schema.GroupVersion{
-    Group:   mycontroller.GroupName,
-    Version: "v1alpha1",
+	Group:   mycontroller.GroupName,
+	Version: "v1alpha1",
 }
 
 // Kind takes an unqualified kind and returns back a Group qualified GroupKind
 func Kind(kind string) schema.GroupKind {
 	return SchemeGroupVersion.WithKind(kind).GroupKind()
 }
+
 // Resource takes an unqualified resource and returns a Group qualified GroupResource
 func Resource(resource string) schema.GroupResource {
-    return SchemeGroupVersion.WithResource(resource).GroupResource()
+	return SchemeGroupVersion.WithResource(resource).GroupResource()
 }
 
 var (
