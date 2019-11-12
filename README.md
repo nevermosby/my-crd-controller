@@ -2,27 +2,52 @@
 
 ## Goal
 
-Inspired by [Kubernetes in Action ](), I can easily build up a website via a git repo and nginx /w kubernetes workload
+Inspired by the implementation of [website controller](https://github.com/luksa/k8s-website-controller/) of [Kubernetes in Action ](https://github.com/luksa/kubernetes-in-action), You can easily build up a website via a git repo and nginx /w kubernetes workload.
 
 ## Development
-1. define ur crd struct
-2. generate the controller stuff
-3. write ur event handler
+1. Define your own crd(CustomResourceDefinitions) struct, for example:
+    ```go
+    type Website struct {
+        metav1.TypeMeta   `json:",inline"`
+        metav1.ObjectMeta `json:"metadata,omitempty"`
 
-## code generation
+        Spec   WebsiteSpec   `json:"spec"`
+        Status WebsiteStatus `json:"status"`
+    }
 
-```bash
-➜  my-crd-controller ./codegen.sh 
-Generating deepcopy funcs
-Generating clientset for mycontroller:v1alpha1 at github.com/nevermosby/my-crd-controller/pkg/client/clientset
-Generating listers for mycontroller:v1alpha1 at github.com/nevermosby/my-crd-controller/pkg/client/listers
-Generating informers for mycontroller:v1alpha1 at github.com/nevermosby/my-crd-controller/pkg/client/informers
+    type WebsiteSpec struct {
+        GitRepo        string `json:"gitRepo"`
+        DeploymentName string `json:"deploymentName"`
+        Replicas       *int32 `json:"replicas"`
+    }
 
-```
+    type WebsiteStatus struct {
+        AvailableReplicas int32 `json:"availableReplicas"`
+    }
 
-## TODO
-- create nodeport service
+    type WebsiteList struct {
+        metav1.TypeMeta `json:",inline"`
+        metav1.ListMeta `json:"metadata,omitempty"`
 
-```yaml
-k expose deployment kubia-website --type=NodePort --name=website
-```
+        Items []Website `json:"items"`
+    }
+    ```
+2. Generate the controller stuff, not write it
+
+    The kubernetes community provides serveral ways to automatically generate the controller stuff, like:
+    - [Code generator](https://github.com/kubernetes/code-generator)
+    - [Kubebuilder](https://github.com/kubernetes-sigs/kubebuilder)
+    - [Operator-sdk](https://github.com/operator-framework/operator-sdk)
+
+    I use `code generator` for this project and wrap it as a shell script *`codegen.sh`*:
+
+    ```bash
+    ./vendor/k8s.io/code-generator/generate-groups.sh "deepcopy,client,informer,lister" \
+    github.com/nevermosby/my-crd-controller/pkg/client \
+    github.com/nevermosby/my-crd-controller/pkg/apis "mycontroller:v1alpha1" \
+    --go-header-file /Users/davidli/gh/myk8scrd/src/github.com/nevermosby/my-crd-controller/hack/custom-boilerplate.go.txt
+    ```
+
+3. Write your event handler
+   - Create the nginx deployment based on the git repo
+   - Create the nodeport service based on the nginx deployment
