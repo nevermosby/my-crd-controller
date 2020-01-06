@@ -4,6 +4,10 @@
 
 Inspired by the implementation of [website controller](https://github.com/luksa/k8s-website-controller/) of [Kubernetes in Action ](https://github.com/luksa/kubernetes-in-action), You can easily build up a website via a git repo and nginx /w kubernetes workload.
 
+You can find more via the blog: 
+- 中文版：[https://davidlovezoe.club/wordpress/archives/690](https://davidlovezoe.club/wordpress/archives/690)
+- English: TODO
+
 ## Development
 1. Define your own crd(CustomResourceDefinitions) struct, for example:
     ```go
@@ -51,3 +55,8 @@ Inspired by the implementation of [website controller](https://github.com/luksa/
 3. Write your event handler
    - Create the nginx deployment based on the git repo
    - Create the nodeport service based on the nginx deployment
+
+## Deploy the CRD and controller
+
+1. Deploy the CRD via YAML
+2. Deploy the controller via deployment

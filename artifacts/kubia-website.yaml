@@ -4,5 +4,5 @@ metadata:
   name: kubia
 spec:
   deploymentName: kubia-website
-  gitRepo: https://github.com/luksa/kubia-website-example.git
-  replicas: 2
+  gitRepo: https://github.com/nevermosby/kubia-website-example.git
+  replicas: 1
